@@ -50,9 +50,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     final signupState = ref.read(signupProvider);
     signupState.maybeWhen(
       data: (response) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Account created! Welcome ${response.user.name}!')),
-        );
+        if (response != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Account created! Welcome ${response.user.name}!')),
+          );
+        }
       },
       error: (error, stack) {
         ScaffoldMessenger.of(context).showSnackBar(

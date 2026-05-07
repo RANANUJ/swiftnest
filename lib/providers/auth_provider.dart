@@ -113,16 +113,16 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
 // ============================================================================
 
 /// Login operation
-final loginProvider = StateNotifierProvider<LoginNotifier, AsyncValue<AuthResponse>>((ref) {
+final loginProvider = StateNotifierProvider<LoginNotifier, AsyncValue<AuthResponse?>>((ref) {
   final authService = ref.watch(authServiceProvider);
   return LoginNotifier(authService, ref);
 });
 
-class LoginNotifier extends StateNotifier<AsyncValue<AuthResponse>> {
+class LoginNotifier extends StateNotifier<AsyncValue<AuthResponse?>> {
   final AuthService _authService;
   final Ref _ref;
 
-  LoginNotifier(this._authService, this._ref) : super(const AsyncValue.loading());
+  LoginNotifier(this._authService, this._ref) : super(const AsyncValue.data(null));
 
   /// Perform login
   Future<void> login({
@@ -150,23 +150,24 @@ class LoginNotifier extends StateNotifier<AsyncValue<AuthResponse>> {
 
   /// Reset state
   void reset() {
-    state = const AsyncValue.loading();
+    state = const AsyncValue.data(null);
   }
 }
 
 /// Signup operation
-final signupProvider = StateNotifierProvider<SignupNotifier, AsyncValue<AuthResponse>>((ref) {
+final signupProvider = StateNotifierProvider<SignupNotifier, AsyncValue<AuthResponse?>>((ref) {
   final authService = ref.watch(authServiceProvider);
   return SignupNotifier(authService, ref);
 });
 
-class SignupNotifier extends StateNotifier<AsyncValue<AuthResponse>> {
+class SignupNotifier extends StateNotifier<AsyncValue<AuthResponse?>> {
   final AuthService _authService;
   final Ref _ref;
 
-  SignupNotifier(this._authService, this._ref) : super(const AsyncValue.loading());
+  SignupNotifier(this._authService, this._ref) : super(const AsyncValue.data(null));
 
-  /// Perform signup
+  /// Perform signup - Creates account but does NOT authenticate yet
+  /// User must verify OTP before access
   Future<void> signup({
     required String email,
     required String password,
@@ -177,6 +178,10 @@ class SignupNotifier extends StateNotifier<AsyncValue<AuthResponse>> {
     state = AsyncValue.loading();
 
     try {
+      // IMPORTANT: Ensure no tokens are present from previous sessions
+      // This prevents accidental auto-authentication
+      await _authService.logout();
+      
       final result = await _authService.signup(
         email: email,
         password: password,
@@ -185,20 +190,28 @@ class SignupNotifier extends StateNotifier<AsyncValue<AuthResponse>> {
         avatar: avatar,
       );
 
-      // Update user
-      _ref.read(currentUserProvider.notifier).setUser(result.user);
-      _ref.read(authStateProvider.notifier).setAuthenticated();
+      // Verify that NO tokens were saved (security check)
+      final hasToken = await _authService.getAccessToken();
+      if (hasToken != null) {
+        print('[Signup] WARNING: Token was saved during signup! Clearing it.');
+        await _authService.logout();
+      }
 
+      // Store signup response but DO NOT authenticate
+      // User must verify OTP first, then complete profile
       state = AsyncValue.data(result);
+      
+      print('[Signup] Account created. Token NOT saved. User must verify OTP before access.');
+      _ref.read(authStateProvider.notifier).setUnauthenticated();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
-      _ref.read(authStateProvider.notifier).setError();
+      _ref.read(authStateProvider.notifier).setUnauthenticated();
     }
   }
 
   /// Reset state
   void reset() {
-    state = const AsyncValue.loading();
+    state = const AsyncValue.data(null);
   }
 }
 

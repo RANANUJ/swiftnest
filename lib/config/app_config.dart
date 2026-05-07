@@ -5,8 +5,18 @@ class AppConfig {
   static const String appName = 'SwiftNest';
   static const String appVersion = '0.1.0';
 
+  // Default API URL - can be overridden at runtime
+  static String _apiBaseUrl = 'http://192.168.0.122:3000';
+
   // API Endpoints
-  static const String apiBaseUrl = 'https://api.swiftnest.com';
+  static String get apiBaseUrl => _apiBaseUrl;
+  
+  // Allow changing API base URL at runtime
+  static void setApiBaseUrl(String url) {
+    _apiBaseUrl = url;
+    print('[AppConfig] API Base URL changed to: $_apiBaseUrl');
+  }
+
   static const String socketBaseUrl = 'https://socket.swiftnest.com';
   static const String mediaBaseUrl = 'https://media.swiftnest.com';
 
@@ -128,8 +138,26 @@ class ApiEndpoints {
   static const String login = '/auth/login';
   static const String logout = '/auth/logout';
   static const String refreshToken = '/auth/refresh';
-  static const String sendOtp = '/auth/otp/send';
-  static const String verifyOtp = '/auth/otp/verify';
+  static const String verifyToken = '/auth/verify-token';
+
+  // OTP
+  static const String sendOtp = '/auth/send-otp';
+  static const String verifyOtp = '/auth/verify-otp';
+
+  // Email Verification
+  static const String resendVerification = '/auth/resend-verification';
+  static const String verifyEmail = '/auth/verify-email';
+  static const String verificationStatus = '/auth/verification-status';
+
+  // Password Reset
+  static const String forgotPassword = '/auth/forgot-password';
+  static const String resetPassword = '/auth/reset-password';
+  static const String validateResetToken = '/auth/validate-reset-token';
+
+  // Device Management
+  static const String getDevices = '/auth/devices';
+  static const String logoutDevice = '/auth/logout-device/:deviceId';
+  static const String logoutAllDevices = '/auth/logout-all-devices';
 
   // User Profile
   static const String getCurrentUser = '/users/me';

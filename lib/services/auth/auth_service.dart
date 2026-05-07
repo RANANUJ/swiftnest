@@ -66,19 +66,13 @@ class AuthService {
       if (response.statusCode == 201 || response.statusCode == 200) {
         final authResponse = AuthResponse.fromJson(response.data ?? {});
 
-        // Save tokens
-        await _tokenStorage.saveTokens(
-          accessToken: authResponse.accessToken,
-          refreshToken: authResponse.refreshToken,
-        );
-
-        // Save user ID
-        await _tokenStorage.saveUserId(authResponse.user.id);
-
-        // Update current user
-        _currentUser = authResponse.user;
-
-        print('[Auth] Signup successful! User: ${authResponse.user.email}');
+        // DO NOT save tokens yet! User must verify OTP first.
+        // Tokens will be saved after OTP verification in verifyOtp()
+        // This ensures users cannot access the app without email verification.
+        
+        // For now, just return the response without saving tokens
+        print('[Auth] Signup successful! User created: ${authResponse.user.email}');
+        print('[Auth] User must verify OTP before tokens are saved.');
         return authResponse;
       } else {
         throw AuthException(
@@ -394,5 +388,262 @@ class AuthService {
       message: message,
       originalError: error,
     );
+  }
+
+  // =========================================================================
+  // EMAIL VERIFICATION
+  // =========================================================================
+
+  /// Request email verification or resend verification email
+  Future<Map<String, dynamic>> resendVerificationEmail({required String email}) async {
+    try {
+      print('[Auth] Requesting email verification for $email');
+
+      final request = {'email': email};
+
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        ApiEndpoints.resendVerification,
+        data: request,
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = response.data ?? {};
+        print('[Auth] Verification email sent successfully');
+        return data;
+      } else {
+        throw AuthException(
+          type: AuthErrorType.serverError,
+          message: 'Failed to send verification email',
+        );
+      }
+    } catch (e) {
+      print('[Auth] Resend verification error: $e');
+      rethrow;
+    }
+  }
+
+  /// Verify email with token
+  Future<Map<String, dynamic>> verifyEmailToken({required String token}) async {
+    try {
+      print('[Auth] Verifying email with token');
+
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        '${ApiEndpoints.verifyEmail}?token=$token',
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data ?? {};
+        print('[Auth] Email verified successfully');
+        return data;
+      } else {
+        throw AuthException(
+          type: AuthErrorType.serverError,
+          message: 'Email verification failed',
+        );
+      }
+    } catch (e) {
+      print('[Auth] Email verification error: $e');
+      rethrow;
+    }
+  }
+
+  /// Get email verification status
+  Future<Map<String, dynamic>> getVerificationStatus() async {
+    try {
+      print('[Auth] Getting email verification status');
+
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        ApiEndpoints.verificationStatus,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data ?? {};
+        print('[Auth] Verification status: ${data['verified']}');
+        return data;
+      } else {
+        throw AuthException(
+          type: AuthErrorType.serverError,
+          message: 'Failed to get verification status',
+        );
+      }
+    } catch (e) {
+      print('[Auth] Verification status error: $e');
+      rethrow;
+    }
+  }
+
+  // =========================================================================
+  // PASSWORD RESET
+  // =========================================================================
+
+  /// Request password reset (forgot password)
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    try {
+      print('[Auth] Sending password reset email to $email');
+
+      final request = {'email': email};
+
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        ApiEndpoints.forgotPassword,
+        data: request,
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = response.data ?? {};
+        print('[Auth] Password reset email sent successfully');
+        return data;
+      } else {
+        throw AuthException(
+          type: AuthErrorType.serverError,
+          message: 'Failed to send password reset email',
+        );
+      }
+    } catch (e) {
+      print('[Auth] Forgot password error: $e');
+      rethrow;
+    }
+  }
+
+  /// Reset password with token
+  Future<Map<String, dynamic>> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    try {
+      print('[Auth] Resetting password with token');
+
+      final request = {
+        'token': token,
+        'newPassword': newPassword,
+      };
+
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        ApiEndpoints.resetPassword,
+        data: request,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data ?? {};
+        print('[Auth] Password reset successfully');
+        return data;
+      } else {
+        throw AuthException(
+          type: AuthErrorType.serverError,
+          message: 'Password reset failed',
+        );
+      }
+    } catch (e) {
+      print('[Auth] Reset password error: $e');
+      rethrow;
+    }
+  }
+
+  /// Validate password reset token
+  Future<Map<String, dynamic>> validateResetToken({required String token}) async {
+    try {
+      print('[Auth] Validating reset token');
+
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        '${ApiEndpoints.validateResetToken}?token=$token',
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data ?? {};
+        print('[Auth] Reset token is valid');
+        return data;
+      } else {
+        throw AuthException(
+          type: AuthErrorType.serverError,
+          message: 'Invalid or expired reset token',
+        );
+      }
+    } catch (e) {
+      print('[Auth] Validate token error: $e');
+      rethrow;
+    }
+  }
+
+  // =========================================================================
+  // DEVICE MANAGEMENT
+  // =========================================================================
+
+  /// Get list of active devices
+  Future<List<Map<String, dynamic>>> getActiveDevices() async {
+    try {
+      print('[Auth] Fetching active devices');
+
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        ApiEndpoints.getDevices,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data ?? {};
+        final devices = (data['devices'] as List?) ?? [];
+        print('[Auth] Retrieved ${devices.length} devices');
+        return devices.cast<Map<String, dynamic>>();
+      } else {
+        throw AuthException(
+          type: AuthErrorType.serverError,
+          message: 'Failed to fetch devices',
+        );
+      }
+    } catch (e) {
+      print('[Auth] Get devices error: $e');
+      rethrow;
+    }
+  }
+
+  /// Logout from specific device
+  Future<Map<String, dynamic>> logoutFromDevice({required String deviceId}) async {
+    try {
+      print('[Auth] Logging out from device $deviceId');
+
+      final url = ApiEndpoints.logoutDevice.replaceAll(':deviceId', deviceId);
+
+      final response = await _apiClient.post<Map<String, dynamic>>(url);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data ?? {};
+        print('[Auth] Logged out from device successfully');
+        return data;
+      } else {
+        throw AuthException(
+          type: AuthErrorType.serverError,
+          message: 'Failed to logout from device',
+        );
+      }
+    } catch (e) {
+      print('[Auth] Logout device error: $e');
+      rethrow;
+    }
+  }
+
+  /// Logout from all devices
+  Future<Map<String, dynamic>> logoutFromAllDevices() async {
+    try {
+      print('[Auth] Logging out from all devices');
+
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        ApiEndpoints.logoutAllDevices,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Clear all tokens locally
+        await _tokenStorage.clearTokens();
+        _currentUser = null;
+
+        final data = response.data ?? {};
+        print('[Auth] Logged out from all devices successfully');
+        return data;
+      } else {
+        throw AuthException(
+          type: AuthErrorType.serverError,
+          message: 'Failed to logout from all devices',
+        );
+      }
+    } catch (e) {
+      print('[Auth] Logout all devices error: $e');
+      rethrow;
+    }
   }
 }

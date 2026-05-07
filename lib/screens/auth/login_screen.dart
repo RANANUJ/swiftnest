@@ -37,10 +37,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final loginState = ref.read(loginProvider);
     loginState.maybeWhen(
       data: (response) {
-        // Navigate to home
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Welcome ${response.user.name}!')),
-        );
+        if (response != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Welcome ${response.user.name}!')),
+          );
+        }
       },
       error: (error, stack) {
         ScaffoldMessenger.of(context).showSnackBar(
